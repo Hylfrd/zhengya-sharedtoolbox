@@ -12,13 +12,13 @@
 
 正雅苑共享工具箱是 BNBU 正雅苑的工具借还系统。学生扫描柜子上的二维码即可开门借还，管理员通过 Web 后台管理柜子、智能锁、成员与借还记录。
 
-系统已接入通通锁开放平台，开锁控制真实的智能锁。
+系统已接入通通锁开放平台，开锁控制真实的智能锁，在 admin 管理页面配置即可。
 
 线上地址：<https://bnbu.hmcl-helper.cn>
 
 ## 后台管理
 
-管理后台为桌面端设计，请用电脑访问 `/admin`。
+访问 `/admin`。初始账号密码均为 admin。管理员密码在“其他”页面底部修改。
 
 ### 智能锁与网关
 
@@ -42,12 +42,10 @@ Key 加密存储。更换提供商或地址时需重新填写。
 
 ### 成员与登录方式
 
-两种登录方式，切换后即时生效：
+提供两种登录方式
 
 - **SSO**：对接学校统一身份认证，仅记录实际登录并返回学号的成员。
 - **名单**：通过 Excel 模板批量导入姓名、学号、宿舍号，仅名单内的成员可用。
-
-借阅记录可在后台筛选并导出为 Excel。管理员密码在“其他”页面底部修改。
 
 ## 开发
 
@@ -73,13 +71,13 @@ macOS / Linux：
 .venv/bin/python -m uvicorn app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
 ```
 
-另开终端启动前端：
+前端启动：
 
 ```sh
 npm --prefix frontend run dev
 ```
 
-访问 <http://127.0.0.1:5173>，前端将 `/api` 转发到本机 `8000`。
+访问 <http://127.0.0.1:5173>，其中前端会将 `/api` 转发到本机 `8000`。
 
 测试：
 
@@ -90,7 +88,7 @@ cd backend && python -m pytest -q
 
 ### GitHub Actions
 
-使用 GitHub Actions 自动部署前，在仓库的 **Settings → Secrets and variables → Actions → Repository secrets** 中，点击 **New repository secret** 添加以下三个参数：
+ci 工作流配置了自动部署，在仓库的 **Settings → Secrets and variables → Actions → Repository secrets** 中，点击 **New repository secret** 添加以下三个参数：
 
 | 名称 | 内容 |
 | --- | --- |
@@ -98,6 +96,6 @@ cd backend && python -m pytest -q
 | `SERVER_USER` | SSH 登录用户名 |
 | `SERVER_PASSWORD` | SSH 登录密码 |
 
-## 开源协议
+## License
 
-AGPL-3.0，详见 [LICENSE](LICENSE)。
+AGPL-3.0
