@@ -8,7 +8,15 @@ from typing import Annotated, Literal
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from app.ai_transport import validate_base_url
 from app.database import Database
@@ -37,7 +45,9 @@ class AIConfig(BaseModel):
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
     provider: Literal['sub2api', 'custom'] = 'sub2api'
     base_url: Annotated[str, Field(max_length=500)] = 'https://sub2api.tk2.xiaoqingtech.org/v1'
-    image_model: Annotated[str, Field(min_length=1, max_length=100, pattern=r'^[A-Za-z0-9._:-]+$')] = 'gpt-image-2.5-sunburst'
+    image_model: Annotated[
+        str, Field(min_length=1, max_length=100, pattern=r'^[A-Za-z0-9._:-]+$')
+    ] = 'gpt-image-2.5-sunburst'
     image_quality: Literal['low', 'medium', 'high', 'xhigh', 'max', 'auto'] = 'high'
     image_background: Literal['transparent', 'opaque', 'auto'] = 'transparent'
     timeout_seconds: Annotated[int, Field(ge=30, le=900, strict=True)] = 600
@@ -88,11 +98,13 @@ class SettingsUpdate(AIConfig):
 class SettingsStore:
     def __init__(self, db_path: Path):
         self.database = Database(db_path)
-        self.key_path = Path(os.environ.get('AI_SETTINGS_KEY_FILE', str(db_path.with_suffix('.ai-key'))))
+        self.key_path = Path(
+            os.environ.get('AI_SETTINGS_KEY_FILE', str(db_path.with_suffix('.ai-key')))
+        )
         with self.database.transaction(write=True) as connection:
-            connection.execute('''CREATE TABLE IF NOT EXISTS ai_settings (
+            connection.execute("""CREATE TABLE IF NOT EXISTS ai_settings (
                 id INTEGER PRIMARY KEY CHECK(id=1), config_json TEXT NOT NULL,
-                key_ciphertext TEXT NOT NULL DEFAULT '')''')
+                key_ciphertext TEXT NOT NULL DEFAULT '')""")
 
     def _cipher(self, *, create: bool = False) -> Fernet:
         try:
@@ -113,21 +125,39 @@ class SettingsStore:
             descriptor = os.open(self.key_path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
             with os.fdopen(descriptor, 'rb') as key_file:
                 metadata = os.fstat(key_file.fileno())
-                if not stat.S_ISREG(metadata.st_mode) or (os.name != 'nt' and metadata.st_mode & 0o077):
+                if not stat.S_ISREG(metadata.st_mode) or (
+                    os.name != 'nt' and metadata.st_mode & 0o077
+                ):
                     raise ValueError('Unsafe key permissions')
                 return Fernet(key_file.read(100))
         except (OSError, ValueError):
-            raise HTTPException(503, detail={'code': 'AI_ENCRYPTION_UNAVAILABLE', 'message': '服务器加密密钥不可用，请检查密钥文件及权限。'}) from None
+            raise HTTPException(
+                503,
+                detail={
+                    'code': 'AI_ENCRYPTION_UNAVAILABLE',
+                    'message': '服务器加密密钥不可用，请检查密钥文件及权限。',
+                },
+            ) from None
 
     @staticmethod
     def _read(connection):
-        row = connection.execute('SELECT config_json,key_ciphertext FROM ai_settings WHERE id=1').fetchone()
+        row = connection.execute(
+            'SELECT config_json,key_ciphertext FROM ai_settings WHERE id=1'
+        ).fetchone()
         if row is None:
             return AIConfig().model_dump(), ''
         try:
-            return AIConfig.model_validate_json(row['config_json']).model_dump(), row['key_ciphertext']
+            return AIConfig.model_validate_json(row['config_json']).model_dump(), row[
+                'key_ciphertext'
+            ]
         except ValidationError:
-            raise HTTPException(503, detail={'code': 'AI_SETTINGS_INVALID', 'message': '已保存的 AI 配置无效，请重新保存配置。'}) from None
+            raise HTTPException(
+                503,
+                detail={
+                    'code': 'AI_SETTINGS_INVALID',
+                    'message': '已保存的 AI 配置无效，请重新保存配置。',
+                },
+            ) from None
 
     def public(self):
         with self.database.transaction() as connection:
@@ -138,11 +168,20 @@ class SettingsStore:
         with self.database.transaction() as connection:
             config, ciphertext = self._read(connection)
         if not ciphertext:
-            raise HTTPException(409, detail={'code': 'AI_KEY_NOT_CONFIGURED', 'message': '请先在“其他”中配置 API key。'})
+            raise HTTPException(
+                409,
+                detail={'code': 'AI_KEY_NOT_CONFIGURED', 'message': '请先在“其他”中配置 API key。'},
+            )
         try:
             config['api_key'] = self._cipher().decrypt(ciphertext.encode('ascii')).decode('utf-8')
         except (InvalidToken, UnicodeError):
-            raise HTTPException(503, detail={'code': 'AI_DECRYPT_FAILED', 'message': '无法解密 API key，请恢复服务器密钥文件，或清除后重新配置。'}) from None
+            raise HTTPException(
+                503,
+                detail={
+                    'code': 'AI_DECRYPT_FAILED',
+                    'message': '无法解密 API key，请恢复服务器密钥文件，或清除后重新配置。',
+                },
+            ) from None
         return config
 
     def save(self, update: SettingsUpdate):
@@ -152,16 +191,26 @@ class SettingsStore:
         config = update.model_dump(exclude={'api_key', 'clear_api_key'})
         with self.database.transaction(write=True) as connection:
             previous, ciphertext = self._read(connection)
-            changed_provider = any(config[field] != previous[field] for field in ('provider', 'base_url'))
+            changed_provider = any(
+                config[field] != previous[field] for field in ('provider', 'base_url')
+            )
             if ciphertext and changed_provider and not key and not update.clear_api_key:
-                raise HTTPException(422, detail={'message': '更换提供商或 API 地址时，请重新填写密钥或清除原密钥。'})
+                raise HTTPException(
+                    422, detail={'message': '更换提供商或 API 地址时，请重新填写密钥或清除原密钥。'}
+                )
             if update.clear_api_key:
                 ciphertext = ''
             elif key:
-                ciphertext = self._cipher(create=not bool(ciphertext)).encrypt(key.encode('utf-8')).decode('ascii')
-            connection.execute('''INSERT INTO ai_settings (id,config_json,key_ciphertext) VALUES (1,?,?)
-                ON CONFLICT(id) DO UPDATE SET config_json=excluded.config_json,key_ciphertext=excluded.key_ciphertext''',
-                (json.dumps(config, ensure_ascii=False), ciphertext))
+                ciphertext = (
+                    self._cipher(create=not bool(ciphertext))
+                    .encrypt(key.encode('utf-8'))
+                    .decode('ascii')
+                )
+            connection.execute(
+                """INSERT INTO ai_settings (id,config_json,key_ciphertext) VALUES (1,?,?)
+                ON CONFLICT(id) DO UPDATE SET config_json=excluded.config_json,key_ciphertext=excluded.key_ciphertext""",
+                (json.dumps(config, ensure_ascii=False), ciphertext),
+            )
         return {**config, 'api_key_configured': bool(ciphertext)}
 
 
@@ -178,7 +227,9 @@ def create_ai_settings_router(require_admin, store: SettingsStore):
         try:
             update = SettingsUpdate.model_validate(await request.json())
         except (ValueError, ValidationError):
-            raise HTTPException(422, detail={'message': 'AI 配置格式无效，请检查地址、参数及提示词中的 {name}。'}) from None
+            raise HTTPException(
+                422, detail={'message': 'AI 配置格式无效，请检查地址、参数及提示词中的 {name}。'}
+            ) from None
         return store.save(update)
 
     return router

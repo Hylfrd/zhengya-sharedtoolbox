@@ -44,14 +44,15 @@ export function installAmbient(root: HTMLElement): () => void {
   }
 
   function move(event: PointerEvent): void {
-    if (reduced.matches || !finePointer.matches || document.hidden || event.pointerType !== 'mouse') return;
+    if (reduced.matches || !finePointer.matches || document.hidden || event.pointerType !== 'mouse')
+      return;
     const now = performance.now();
     if (pointer) {
       const elapsed = now - pointer.time;
       if (elapsed > 0 && elapsed < 250) {
         const distance = Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y);
         // Accelerate the existing timeline, rather than restarting keyframes.
-        targetSpeed = Math.max(targetSpeed, 1 + Math.min(1.5, distance / elapsed * 0.7));
+        targetSpeed = Math.max(targetSpeed, 1 + Math.min(1.5, (distance / elapsed) * 0.7));
         if (!frame) frame = requestAnimationFrame(tick);
       }
     }

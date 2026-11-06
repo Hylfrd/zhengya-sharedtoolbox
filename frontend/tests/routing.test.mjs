@@ -1,6 +1,6 @@
-import {test} from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {shouldOpenAdmin} from '../src/routing.ts';
+import { shouldOpenAdmin } from '../src/routing.ts';
 
 test('fresh admin sign-in opens management, restored cabinet links stay in their cabinet', () => {
   assert.equal(shouldOpenAdmin('admin', '/scan/A', true), true);

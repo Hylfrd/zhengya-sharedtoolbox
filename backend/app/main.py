@@ -20,38 +20,40 @@ from app.ttlock import TTLockService, create_ttlock_router
 
 # Vite's default content fingerprint is eight URL-safe base64 characters.
 # Unversioned public files (licences, etc.) must be revalidated after deployment.
-FINGERPRINTED_ASSET = re.compile(r"^/assets/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css|png|jpe?g|webp|avif|svg|ico|woff2?|ttf)$")
+FINGERPRINTED_ASSET = re.compile(
+    r'^/assets/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css|png|jpe?g|webp|avif|svg|ico|woff2?|ttf)$'
+)
 
 
 def create_app(frontend_dist: Path | None = None, db_path: Path | None = None) -> FastAPI:
     application = FastAPI(
-        title="Zhengya Shared Toolbox",
+        title='Zhengya Shared Toolbox',
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
     )
-    version = os.environ.get("APP_VERSION", "development")
+    version = os.environ.get('APP_VERSION', 'development')
     dist = (
         frontend_dist
         if frontend_dist is not None
         else Path(
             os.environ.get(
-                "FRONTEND_DIST",
-                str(Path(__file__).resolve().parents[2] / "frontend" / "dist"),
+                'FRONTEND_DIST',
+                str(Path(__file__).resolve().parents[2] / 'frontend' / 'dist'),
             )
         )
     ).resolve()
 
-    @application.get("/api/health")
+    @application.get('/api/health')
     def health() -> dict[str, str]:
         # Process liveness only; upstream services are not called here.
-        return {"status": "ok", "service": "tongtongsuo", "version": version}
+        return {'status': 'ok', 'service': 'tongtongsuo', 'version': version}
 
-    @application.get("/api/status")
+    @application.get('/api/status')
     def status() -> dict[str, str]:
-        return {"authentication": "school_account", "lock_control": "not_configured"}
+        return {'authentication': 'school_account', 'lock_control': 'not_configured'}
 
-    db_path = Path(db_path or os.environ.get("DATABASE_PATH", "runtime/tongtongsuo.sqlite3"))
+    db_path = Path(db_path or os.environ.get('DATABASE_PATH', 'runtime/tongtongsuo.sqlite3'))
     auth = AuthManager(db_path=db_path)
     application.add_middleware(AdminBodyLimitMiddleware)
     application.include_router(auth.router)
@@ -62,75 +64,77 @@ def create_app(frontend_dist: Path | None = None, db_path: Path | None = None) -
     application.include_router(create_cabinet_router(auth.require_user, db_path, ttlock))
     ai_settings = SettingsStore(db_path)
     application.include_router(create_ai_settings_router(auth.require_admin, ai_settings))
-    application.include_router(create_ai_generation_router(auth.require_admin, ai_settings, db_path))
+    application.include_router(
+        create_ai_generation_router(auth.require_admin, ai_settings, db_path)
+    )
 
-    @application.middleware("http")
+    @application.middleware('http')
     async def private_api_responses(request: Request, call_next):
         response = await call_next(request)
         path = request.url.path
-        if path.startswith("/api/") or response.status_code >= 400:
-            response.headers["Cache-Control"] = "no-store"
-        elif path.startswith("/assets/"):
-            response.headers["Cache-Control"] = (
-                "public, max-age=31536000, immutable"
+        if path.startswith('/api/') or response.status_code >= 400:
+            response.headers['Cache-Control'] = 'no-store'
+        elif path.startswith('/assets/'):
+            response.headers['Cache-Control'] = (
+                'public, max-age=31536000, immutable'
                 if response.status_code in (200, 206, 304) and FINGERPRINTED_ASSET.fullmatch(path)
-                else "no-cache"
+                else 'no-cache'
             )
-        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
 
-    @application.get("/api/auth/login")
-    @application.get("/api/auth/callback")
+    @application.get('/api/auth/login')
+    @application.get('/api/auth/callback')
     def authentication_unavailable() -> None:
         raise HTTPException(
             status_code=503,
             detail={
-                "code": "AUTH_NOT_CONFIGURED",
-                "message": "请通过本项目登录表单验证学校账号；学校直接回调尚未接入。",
+                'code': 'AUTH_NOT_CONFIGURED',
+                'message': '请通过本项目登录表单验证学校账号；学校直接回调尚未接入。',
             },
         )
 
-    @application.post("/api/locks/{lock_id}/unlock")
+    @application.post('/api/locks/{lock_id}/unlock')
     def unlock_unavailable(lock_id: str) -> None:
         raise HTTPException(
             status_code=503,
             detail={
-                "code": "LOCK_CONTROL_NOT_CONFIGURED",
-                "message": "通通锁接口尚未接入，暂时无法开锁。",
+                'code': 'LOCK_CONTROL_NOT_CONFIGURED',
+                'message': '通通锁接口尚未接入，暂时无法开锁。',
             },
         )
 
     def frontend_index() -> FileResponse:
-        index = dist / "index.html"
+        index = dist / 'index.html'
         if not index.is_file():
             raise HTTPException(
                 status_code=503,
                 detail={
-                    "code": "FRONTEND_NOT_BUILT",
-                    "message": "网页尚未构建，请先完成前端构建后再访问。",
+                    'code': 'FRONTEND_NOT_BUILT',
+                    'message': '网页尚未构建，请先完成前端构建后再访问。',
                 },
             )
-        return FileResponse(index, headers={"Cache-Control": "no-cache"})
+        return FileResponse(index, headers={'Cache-Control': 'no-cache'})
 
-    @application.get("/", include_in_schema=False)
-    @application.get("/m", include_in_schema=False)
-    @application.get("/admin", include_in_schema=False)
-    @application.get("/license", include_in_schema=False)
-    @application.get("/contact", include_in_schema=False)
+    @application.get('/', include_in_schema=False)
+    @application.get('/m', include_in_schema=False)
+    @application.get('/admin', include_in_schema=False)
+    @application.get('/license', include_in_schema=False)
+    @application.get('/contact', include_in_schema=False)
     def frontend_root() -> FileResponse:
         return frontend_index()
 
-    @application.get("/scan/{cabinet_code}", include_in_schema=False)
-    @application.get("/m/scan/{cabinet_code}", include_in_schema=False)
+    @application.get('/scan/{cabinet_code}', include_in_schema=False)
+    @application.get('/m/scan/{cabinet_code}', include_in_schema=False)
     def frontend_scan(cabinet_code: str) -> FileResponse:
         # A QR reference identifies an entry point; it never grants permission.
         return frontend_index()
 
     # Restrict SPA entry points so misspelled API and asset URLs retain real 404s.
     # Build assets before starting the production process.
-    assets = dist / "assets"
+    assets = dist / 'assets'
     if assets.is_dir():
-        application.mount("/assets", StaticFiles(directory=assets), name="assets")
+        application.mount('/assets', StaticFiles(directory=assets), name='assets')
 
     return application
 

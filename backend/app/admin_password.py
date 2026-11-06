@@ -10,16 +10,16 @@ ITERATIONS = 600_000
 
 def create_password_hash(password: str) -> str:
     if not 5 <= len(password) <= 256:
-        raise ValueError("Administrator password must contain 5 to 256 characters")
+        raise ValueError('Administrator password must contain 5 to 256 characters')
     salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, ITERATIONS)
-    return f"pbkdf2_sha256${ITERATIONS}${salt.hex()}${digest.hex()}"
+    digest = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, ITERATIONS)
+    return f'pbkdf2_sha256${ITERATIONS}${salt.hex()}${digest.hex()}'
 
 
 def parse_password_hash(encoded: str) -> tuple[bytes, bytes] | None:
     try:
-        algorithm, iterations, salt_hex, digest_hex = encoded.split("$")
-        if algorithm != "pbkdf2_sha256" or iterations != str(ITERATIONS):
+        algorithm, iterations, salt_hex, digest_hex = encoded.split('$')
+        if algorithm != 'pbkdf2_sha256' or iterations != str(ITERATIONS):
             return None
         # Bound cost and reject whitespace / noncanonical or truncated encodings.
         if not 32 <= len(salt_hex) <= 128 or len(digest_hex) != 64:
@@ -34,14 +34,14 @@ def parse_password_hash(encoded: str) -> tuple[bytes, bytes] | None:
 
 def verify_password(password: str, parsed: tuple[bytes, bytes]) -> bool:
     salt, expected = parsed
-    actual = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, ITERATIONS)
+    actual = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, ITERATIONS)
     return hmac.compare_digest(actual, expected)
 
 
-if __name__ == "__main__":
-    password = getpass.getpass("Administrator password (5+ characters): ")
-    if password != getpass.getpass("Repeat password: "):
-        raise SystemExit("Passwords do not match")
+if __name__ == '__main__':
+    password = getpass.getpass('Administrator password (5+ characters): ')
+    if password != getpass.getpass('Repeat password: '):
+        raise SystemExit('Passwords do not match')
     try:
         print(create_password_hash(password))
     except ValueError as exc:

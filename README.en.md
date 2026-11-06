@@ -12,13 +12,13 @@
 
 The shared toolbox borrowing system at Positive Education Hall (正雅苑), BNBU. Students scan the QR code on a cabinet to open it and borrow or return tools; administrators manage cabinets, smart locks, members and borrowing records through the web dashboard.
 
-The system is connected to the TTLock Open Platform and controls real smart locks.
+The system is connected to the TTLock Open Platform and controls real smart locks. Configure it in the admin dashboard.
 
 Live: <https://bnbu.hmcl-helper.cn>
 
 ## Admin Dashboard
 
-The admin console is designed for desktop; open `/admin` on a computer.
+Open `/admin`. The initial username and password are both `admin`. The admin password can be changed at the bottom of **其他**.
 
 ### TTLock and gateways
 
@@ -32,7 +32,7 @@ The lock **编辑** view adjusts the internal code, auto-lock, passage schedules
 - Saving parameters pushes them to the lock and reads them back. If the result is unknown, click **查询配置** for the latest values before retrying.
 - A success message only means the command was sent. Whether the cabinet door is actually closed must be confirmed on site.
 
-The gateway **编辑** view renames the local entry and shows gateway type, MAC, network, online state and the signal strength of associated locks. Gateway–lock associations are discovered by TTLock and synced on query.
+The gateway **编辑** view lets you change its local name and notes, and shows its type, MAC, network, online status and the signal strength of associated locks. Gateway–lock associations are discovered by TTLock and synced to this system when queried.
 
 ### AI icon generation
 
@@ -42,12 +42,10 @@ The Key is stored encrypted. Changing the provider or base URL requires re-enter
 
 ### Members and sign-in modes
 
-Two sign-in modes, effective immediately when switched:
+Two sign-in modes are available:
 
 - **SSO**: uses the school's unified identity provider and records only members who signed in with a returned student ID.
 - **Roster**: bulk-imports name, student ID and room number from an Excel template; only listed members can sign in.
-
-Borrowing records can be filtered and exported to Excel in the dashboard. The admin password is changed at the bottom of **其他**.
 
 ## Development
 
@@ -90,7 +88,7 @@ cd backend && python -m pytest -q
 
 ### GitHub Actions
 
-Before using GitHub Actions for automatic deployment, open **Settings → Secrets and variables → Actions → Repository secrets** in the repository. Click **New repository secret** to add these three values:
+The CI workflow is configured for automatic deployment. In the repository, open **Settings → Secrets and variables → Actions → Repository secrets**, then click **New repository secret** to add these three values:
 
 | Name | Value |
 | --- | --- |
@@ -100,4 +98,4 @@ Before using GitHub Actions for automatic deployment, open **Settings → Secret
 
 ## License
 
-AGPL-3.0, see [LICENSE](LICENSE).
+AGPL-3.0

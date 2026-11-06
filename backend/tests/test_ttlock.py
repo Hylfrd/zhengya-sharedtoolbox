@@ -16,16 +16,42 @@ def service(tmp_path, handler):
 
 
 def token():
-    return {'access_token': 'private-access', 'refresh_token': 'private-refresh', 'expires_in': 3600}
+    return {
+        'access_token': 'private-access',
+        'refresh_token': 'private-refresh',
+        'expires_in': 3600,
+    }
 
 
 def cloud(request):
     if request.url.path == '/oauth2/token':
         return httpx.Response(200, json=token())
     if request.url.path == '/v3/lock/list':
-        return httpx.Response(200, json={'list': [{'lockId': 11, 'lockAlias': '云名称', 'lockData': 'NEVER_STORE', 'featureValue': '500'}], 'pages': 1})
+        return httpx.Response(
+            200,
+            json={
+                'list': [
+                    {
+                        'lockId': 11,
+                        'lockAlias': '云名称',
+                        'lockData': 'NEVER_STORE',
+                        'featureValue': '500',
+                    }
+                ],
+                'pages': 1,
+            },
+        )
     if request.url.path == '/v3/gateway/list':
-        return httpx.Response(200, json={'list': [{'gatewayId': 21, 'gatewayName': 'G2'}, {'gatewayId': 22, 'gatewayName': 'G2备份'}], 'pages': 1})
+        return httpx.Response(
+            200,
+            json={
+                'list': [
+                    {'gatewayId': 21, 'gatewayName': 'G2'},
+                    {'gatewayId': 22, 'gatewayName': 'G2备份'},
+                ],
+                'pages': 1,
+            },
+        )
     if request.url.path == '/v3/gateway/listLock':
         return httpx.Response(200, json={'list': [{'lockId': 11}]})
     raise AssertionError(request.url.path)
@@ -35,12 +61,14 @@ def test_secrets_remain_encrypted_and_routes_require_admin(tmp_path):
     calls = []
 
     import hashlib
+
     def checked(request):
         assert request.url.host == 'cnapi.ttlock.com'
         values = parse_qs(request.content.decode())
         assert values['password'] == [hashlib.md5(b'local-test-password').hexdigest()]
         calls.append(request)
         return httpx.Response(200, json=token())
+
     instance = service(tmp_path, checked)
     instance.transport = httpx.MockTransport(checked)
     public = instance.connect('+8613800000000', 'local-test-password')
@@ -54,10 +82,20 @@ def test_secrets_remain_encrypted_and_routes_require_admin(tmp_path):
 
     def denied():
         raise HTTPException(401, '请登录')
+
     app = FastAPI()
     app.include_router(create_ttlock_router(denied, instance))
     client = TestClient(app)
-    for method, path in [('GET', 'settings'), ('PUT', 'settings'), ('POST', 'connect'), ('POST', 'sync'), ('GET', 'locks/1/settings'), ('PATCH', 'locks/1/settings'), ('GET', 'gateways/1/settings'), ('PATCH', 'gateways/1/settings')]:
+    for method, path in [
+        ('GET', 'settings'),
+        ('PUT', 'settings'),
+        ('POST', 'connect'),
+        ('POST', 'sync'),
+        ('GET', 'locks/1/settings'),
+        ('PATCH', 'locks/1/settings'),
+        ('GET', 'gateways/1/settings'),
+        ('PATCH', 'gateways/1/settings'),
+    ]:
         assert client.request(method, '/api/admin/ttlock/' + path, json={}).status_code == 401
     instance.save_settings({'client_id': 'another-application'})
     assert instance.public()['connected'] is False
@@ -66,31 +104,62 @@ def test_secrets_remain_encrypted_and_routes_require_admin(tmp_path):
 
 def test_refresh_and_full_sync_preserve_local_management_and_cloud_links(tmp_path):
     calls = []
+
     def handler(request):
         calls.append(request)
         if request.url.path == '/v3/lock/list':
             page = int(request.url.params['pageNo'])
-            return httpx.Response(200, json={'list': [{'lockId': page + 10, 'lockAlias': '云名称', 'lockData': 'NEVER_STORE', 'featureValue': '500'}], 'pages': 2})
+            return httpx.Response(
+                200,
+                json={
+                    'list': [
+                        {
+                            'lockId': page + 10,
+                            'lockAlias': '云名称',
+                            'lockData': 'NEVER_STORE',
+                            'featureValue': '500',
+                        }
+                    ],
+                    'pages': 2,
+                },
+            )
         return cloud(request)
+
     instance = service(tmp_path, handler)
     instance.connect('cloud-account', 'password')
     with instance.database.transaction(write=True) as connection:
-        connection.execute("INSERT INTO locks(code,name,provider_lock_id,cabinet_id,notes) VALUES('A-L1','自定义名','11',1,'本地备注')")
+        connection.execute(
+            "INSERT INTO locks(code,name,provider_lock_id,cabinet_id,notes) VALUES('A-L1','自定义名','11',1,'本地备注')"
+        )
         connection.execute('UPDATE ttlock_settings SET expires_at=1')
     result = instance.sync()
-    assert result == {'locks_added': 1, 'locks_updated': 1, 'gateways_added': 2, 'gateways_updated': 0}
+    assert result == {
+        'locks_added': 1,
+        'locks_updated': 1,
+        'gateways_added': 2,
+        'gateways_updated': 0,
+    }
     refresh = [request for request in calls if b'grant_type=refresh_token' in request.content]
     assert len(refresh) == 1
     with instance.database.transaction() as connection:
-        lock = dict(connection.execute("SELECT * FROM locks WHERE provider_lock_id='11'").fetchone())
+        lock = dict(
+            connection.execute("SELECT * FROM locks WHERE provider_lock_id='11'").fetchone()
+        )
         details = connection.execute('SELECT details FROM ttlock_devices').fetchall()
-    assert (lock['name'], lock['cabinet_id'], lock['notes'], lock['gateway_id']) == ('自定义名', 1, '本地备注', None)
+    assert (lock['name'], lock['cabinet_id'], lock['notes'], lock['gateway_id']) == (
+        '自定义名',
+        1,
+        '本地备注',
+        None,
+    )
     assert 'NEVER_STORE' not in str([tuple(row) for row in details])
     snapshot = instance.device_snapshot('locks', lock['id'])
     assert snapshot['status'] == 'unknown'
     assert len(snapshot['cloud_gateways']) == 2
     # A failed later pagination/association request cannot erase the saved inventory or associations.
-    instance.transport = httpx.MockTransport(lambda request: httpx.Response(200, json={'errcode': -3002}))
+    instance.transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, json={'errcode': -3002})
+    )
     with pytest.raises(HTTPException):
         instance.sync()
     assert instance.device_snapshot('locks', lock['id']) == snapshot
@@ -98,6 +167,7 @@ def test_refresh_and_full_sync_preserve_local_management_and_cloud_links(tmp_pat
 
 def test_unknown_command_is_not_retried_and_requires_explicit_status(tmp_path):
     commands = []
+
     def handler(request):
         if request.url.path == '/v3/lock/unlock':
             commands.append(request)
@@ -105,6 +175,7 @@ def test_unknown_command_is_not_retried_and_requires_explicit_status(tmp_path):
         if request.url.path == '/v3/lock/queryOpenState':
             return httpx.Response(200, json={'state': 1})
         return cloud(request)
+
     instance = service(tmp_path, handler)
     instance.connect('cloud-account', 'password')
     instance.sync()
@@ -128,10 +199,12 @@ def test_unknown_command_is_not_retried_and_requires_explicit_status(tmp_path):
     assert audit['error_code'] == 'COMMAND_RESULT_UNKNOWN'
     # A syntactically valid JSON response is not evidence that a command succeeded.
     for index, malformed in enumerate(({}, {'errcode': None}, {'errcode': False})):
+
         def invalid_response(request):
             if request.url.path == '/v3/lock/unlock':
                 return httpx.Response(200, json=malformed)
             return cloud(request)
+
         other = service(tmp_path / str(index), invalid_response)
         other.connect('cloud-account', 'password')
         other.sync()
@@ -142,34 +215,62 @@ def test_unknown_command_is_not_retried_and_requires_explicit_status(tmp_path):
 
 
 def test_provider_errors_and_validation_never_echo_credentials(tmp_path):
-    instance = service(tmp_path, lambda request: httpx.Response(200, json={'errcode': 10007, 'errmsg': 'private-secret private-access'}))
+    instance = service(
+        tmp_path,
+        lambda request: httpx.Response(
+            200, json={'errcode': 10007, 'errmsg': 'private-secret private-access'}
+        ),
+    )
     app = FastAPI()
     app.include_router(create_ttlock_router(lambda: None, instance))
     client = TestClient(app)
-    response = client.post('/api/admin/ttlock/connect', json={'username': 'cloud', 'password': 'private-secret'})
+    response = client.post(
+        '/api/admin/ttlock/connect', json={'username': 'cloud', 'password': 'private-secret'}
+    )
     assert response.status_code == 502
     assert 'private-secret' not in response.text
-    response = client.put('/api/admin/ttlock/settings', json={'client_secret': {'private-secret': 'value'}})
+    response = client.put(
+        '/api/admin/ttlock/settings', json={'client_secret': {'private-secret': 'value'}}
+    )
     assert response.status_code == 422
     assert 'private-secret' not in response.text
     assert instance.public()['connected'] is False
 
+
 def configured_lock(tmp_path, *, fail_setting=None):
     bits = (4, 15, 22, 23, 28, 29, 30, 36, 43, 46, 51)
-    state = {'lockId': 11, 'lockName': 'factory-name', 'lockAlias': 'A 柜锁', 'lockMac': 'AA:BB',
-             'featureValue': format(sum(1 << bit for bit in bits), 'x'), 'autoLockTime': 5,
-             'lockSound': 1, 'soundVolume': 3, 'openDirection': 1, 'privacyLock': 2,
-             'tamperAlert': 2, 'resetButton': 1, 'modelNum': 'MODEL', 'electricQuantity': 80,
-             'noKeyPwd': 'DO-NOT-EXPOSE', 'lockData': 'DO-NOT-EXPOSE'}
+    state = {
+        'lockId': 11,
+        'lockName': 'factory-name',
+        'lockAlias': 'A 柜锁',
+        'lockMac': 'AA:BB',
+        'featureValue': format(sum(1 << bit for bit in bits), 'x'),
+        'autoLockTime': 5,
+        'lockSound': 1,
+        'soundVolume': 3,
+        'openDirection': 1,
+        'privacyLock': 2,
+        'tamperAlert': 2,
+        'resetButton': 1,
+        'modelNum': 'MODEL',
+        'electricQuantity': 80,
+        'noKeyPwd': 'DO-NOT-EXPOSE',
+        'lockData': 'DO-NOT-EXPOSE',
+    }
     passage = {'passageMode': 2, 'autoUnlock': 2, 'cyclicConfig': []}
     writes = []
+
     def handler(request):
         path = request.url.path
         if path == '/v3/lock/detail':
             return httpx.Response(200, json=state)
         if path == '/v3/lock/getPassageModeConfiguration':
             return httpx.Response(200, json=passage)
-        if path in {'/v3/lock/setAutoLockTime', '/v3/lock/updateSetting', '/v3/lock/configurePassageMode'}:
+        if path in {
+            '/v3/lock/setAutoLockTime',
+            '/v3/lock/updateSetting',
+            '/v3/lock/configurePassageMode',
+        }:
             form = {key: value[0] for key, value in parse_qs(request.content.decode()).items()}
             writes.append((path, form))
             if path == '/v3/lock/updateSetting':
@@ -177,15 +278,29 @@ def configured_lock(tmp_path, *, fail_setting=None):
                 setting_type = int(form['type'])
                 if setting_type == fail_setting:
                     raise httpx.ReadTimeout('private upstream error', request=request)
-                state[{2: 'privacyLock', 3: 'tamperAlert', 4: 'resetButton', 6: 'lockSound', 7: 'openDirection', 8: 'soundVolume'}[setting_type]] = int(form['value'])
+                state[
+                    {
+                        2: 'privacyLock',
+                        3: 'tamperAlert',
+                        4: 'resetButton',
+                        6: 'lockSound',
+                        7: 'openDirection',
+                        8: 'soundVolume',
+                    }[setting_type]
+                ] = int(form['value'])
             elif path == '/v3/lock/setAutoLockTime':
                 assert form['type'] == '2'
                 state['autoLockTime'] = int(form['seconds'])
             else:
                 assert form['type'] == '2'
-                passage.update(passageMode=int(form['passageMode']), autoUnlock=int(form['autoUnlock']), cyclicConfig=json.loads(form['cyclicConfig']))
+                passage.update(
+                    passageMode=int(form['passageMode']),
+                    autoUnlock=int(form['autoUnlock']),
+                    cyclicConfig=json.loads(form['cyclicConfig']),
+                )
             return httpx.Response(200, json={'errcode': 0})
         return cloud(request)
+
     instance = service(tmp_path, handler)
     instance.connect('cloud-account', 'password')
     instance.sync()
@@ -211,9 +326,22 @@ def test_lock_settings_readback_capabilities_and_minimal_hardware_patch(tmp_path
         instance.update_lock_settings(1, {'auto_lock_seconds': True}, 'Admin')
     assert invalid.value.status_code == 422
     assert writes == []
-    result = instance.update_lock_settings(1, {'auto_lock_seconds': 10, 'sound_volume': 3,
-              'passage_mode': True, 'passage_schedules': [{'weekdays': [2, 1], 'all_day': False, 'start_minute': 480, 'end_minute': 1080}]}, 'Admin')
-    assert [path for path, _ in writes] == ['/v3/lock/setAutoLockTime', '/v3/lock/configurePassageMode']
+    result = instance.update_lock_settings(
+        1,
+        {
+            'auto_lock_seconds': 10,
+            'sound_volume': 3,
+            'passage_mode': True,
+            'passage_schedules': [
+                {'weekdays': [2, 1], 'all_day': False, 'start_minute': 480, 'end_minute': 1080}
+            ],
+        },
+        'Admin',
+    )
+    assert [path for path, _ in writes] == [
+        '/v3/lock/setAutoLockTime',
+        '/v3/lock/configurePassageMode',
+    ]
     assert result['settings']['auto_lock_seconds'] == 10
     assert result['settings']['passage_schedules'][0]['weekdays'] == [1, 2]
     assert result['message'] == '锁设置已更新。'
@@ -225,7 +353,9 @@ def test_lock_settings_readback_capabilities_and_minimal_hardware_patch(tmp_path
 def test_lock_setting_partial_timeout_stops_writes_and_returns_safe_readback(tmp_path):
     instance, writes = configured_lock(tmp_path, fail_setting=2)
     with pytest.raises(HTTPException) as failure:
-        instance.update_lock_settings(1, {'auto_lock_seconds': 10, 'privacy_lock': True, 'tamper_alert': True}, 'Admin')
+        instance.update_lock_settings(
+            1, {'auto_lock_seconds': 10, 'privacy_lock': True, 'tamper_alert': True}, 'Admin'
+        )
     detail = failure.value.detail
     assert failure.value.status_code == 504
     assert detail['code'] == 'TTLOCK_SETTINGS_PARTIAL'
@@ -237,20 +367,48 @@ def test_lock_setting_partial_timeout_stops_writes_and_returns_safe_readback(tmp
     assert 'private upstream' not in json.dumps(detail)
     assert len(writes) == 2
     with instance.database.transaction() as connection:
-        rows = connection.execute('SELECT setting,outcome FROM ttlock_setting_changes ORDER BY id').fetchall()
-    assert [tuple(row) for row in rows] == [('auto_lock_seconds', 'confirmed'), ('privacy_lock', 'unknown')]
+        rows = connection.execute(
+            'SELECT setting,outcome FROM ttlock_setting_changes ORDER BY id'
+        ).fetchall()
+    assert [tuple(row) for row in rows] == [
+        ('auto_lock_seconds', 'confirmed'),
+        ('privacy_lock', 'unknown'),
+    ]
+
 
 def test_gateway_cloud_rename_preserves_alias_and_refreshes_links_without_retry(tmp_path):
-    gateway = {'gatewayId': 21, 'gatewayName': '网关一', 'gatewayVersion': 2,
-               'gatewayMac': 'AA:BB:21', 'networkName': 'Campus', 'networkMac': 'CC:DD:01',
-               'isOnline': 1, 'lockNum': 1, 'private_key': 'NEVER_EXPOSE'}
+    gateway = {
+        'gatewayId': 21,
+        'gatewayName': '网关一',
+        'gatewayVersion': 2,
+        'gatewayMac': 'AA:BB:21',
+        'networkName': 'Campus',
+        'networkMac': 'CC:DD:01',
+        'isOnline': 1,
+        'lockNum': 1,
+        'private_key': 'NEVER_EXPOSE',
+    }
     renames = []
     timeout = False
+
     def handler(request):
         if request.url.path == '/v3/gateway/detail':
             return httpx.Response(200, json=gateway)
         if request.url.path == '/v3/gateway/listLock':
-            return httpx.Response(200, json={'list': [{'lockId': 11, 'lockAlias': '平台锁名', 'rssi': -65, 'updateDate': 1792300000000, 'lockData': 'NEVER_EXPOSE'}]})
+            return httpx.Response(
+                200,
+                json={
+                    'list': [
+                        {
+                            'lockId': 11,
+                            'lockAlias': '平台锁名',
+                            'rssi': -65,
+                            'updateDate': 1792300000000,
+                            'lockData': 'NEVER_EXPOSE',
+                        }
+                    ]
+                },
+            )
         if request.url.path == '/v3/gateway/rename':
             values = parse_qs(request.content.decode())
             assert values['gatewayId'] == ['21']
@@ -260,6 +418,7 @@ def test_gateway_cloud_rename_preserves_alias_and_refreshes_links_without_retry(
                 raise httpx.ReadTimeout('upstream secret', request=request)
             return httpx.Response(200, json={'errcode': 0})
         return cloud(request)
+
     instance = service(tmp_path, handler)
     instance.connect('fixture-account', 'fixture-password')
     instance.sync()
@@ -284,5 +443,8 @@ def test_gateway_cloud_rename_preserves_alias_and_refreshes_links_without_retry(
     assert failure.value.detail['current']['settings']['cloud_name'] == 'B区网关'
     assert renames == ['A区网关', 'B区网关']
     with instance.database.transaction() as connection:
-        outcomes = [row[0] for row in connection.execute('SELECT outcome FROM ttlock_gateway_changes ORDER BY id')]
+        outcomes = [
+            row[0]
+            for row in connection.execute('SELECT outcome FROM ttlock_gateway_changes ORDER BY id')
+        ]
     assert outcomes == ['confirmed', 'unknown']

@@ -11,7 +11,10 @@
   pointer-events: none;
   z-index: 1000;
 }
-.toast-stack::backdrop { background: transparent; pointer-events: none; }
+.toast-stack::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
 .toast {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) 36px;
@@ -26,23 +29,120 @@
   overflow: hidden;
   --toast-accent: #16758e;
   pointer-events: auto;
-  animation: toast-enter 420ms cubic-bezier(.2, 1.2, .3, 1) both;
+  animation: toast-enter 420ms cubic-bezier(0.2, 1.2, 0.3, 1) both;
 }
-.toast p { margin: 0; font: 14px/1.7 'PingFang SC', 'Microsoft YaHei', sans-serif; overflow-wrap: anywhere; }
-.toast-symbol { display:grid; place-items:center; width:24px; height:24px; color:var(--toast-accent); }
-.toast-symbol svg { display:block; width: 22px; height: 22px; }
-.toast-error { --toast-accent: #b44235; }
-.toast-success { --toast-accent: #227857; }
-.toast-progress { position:absolute; inset:auto 0 0; height:3px; background:var(--toast-accent); opacity:.65; transform-origin:left; animation:toast-countdown 3s linear both; animation-play-state:paused; }
-.toast-dismiss { padding: 8px; display: grid; place-items: center; margin: 0; min-height: 36px; width: 36px; border: 0; border-radius: 7px; color: #526d7b; background: transparent; cursor: pointer; }
-.toast-dismiss svg { display:block; width: 20px; height: 20px; }
-.toast-dismiss:hover { background: #e8f3f7; color: #153b50; }
-.toast-dismiss:focus-visible { outline: 3px solid #007e9a; outline-offset: 2px; }
-.toast.is-leaving { animation: toast-leave 260ms ease-out both; }
-@keyframes toast-enter { from { opacity: 0; transform: translateY(-16px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes toast-leave { to { opacity: 0; transform: translateY(-8px) scale(.98); } }
-@keyframes toast-countdown { from { transform:scaleX(1); } to { transform:scaleX(0); } }
-@media (max-width: 720px) { .toast-stack { inset: 12px 12px auto; width: auto; } .toast { padding: 13px 8px 13px 14px; gap: 8px; } .toast p { font-size: 13px; } }
-@media (prefers-reduced-motion: reduce) { .toast, .toast.is-leaving { animation: none; } }
+.toast p {
+  margin: 0;
+  font:
+    14px/1.7 'PingFang SC',
+    'Microsoft YaHei',
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+.toast-symbol {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--toast-accent);
+}
+.toast-symbol svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+.toast-error {
+  --toast-accent: #b44235;
+}
+.toast-success {
+  --toast-accent: #227857;
+}
+.toast-progress {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: var(--toast-accent);
+  opacity: 0.65;
+  transform-origin: left;
+  animation: toast-countdown 3s linear both;
+  animation-play-state: paused;
+}
+.toast-dismiss {
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  min-height: 36px;
+  width: 36px;
+  border: 0;
+  border-radius: 7px;
+  color: #526d7b;
+  background: transparent;
+  cursor: pointer;
+}
+.toast-dismiss svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.toast-dismiss:hover {
+  background: #e8f3f7;
+  color: #153b50;
+}
+.toast-dismiss:focus-visible {
+  outline: 3px solid #007e9a;
+  outline-offset: 2px;
+}
+.toast.is-leaving {
+  animation: toast-leave 260ms ease-out both;
+}
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes toast-leave {
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@media (max-width: 720px) {
+  .toast-stack {
+    inset: 12px 12px auto;
+    width: auto;
+  }
+  .toast {
+    padding: 13px 8px 13px 14px;
+    gap: 8px;
+  }
+  .toast p {
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast.is-leaving {
+    animation: none;
+  }
+}
 
-body:has(.phone-preview) .toast-stack { right:max(12px,calc((100vw - 430px) / 2 + 12px)); left:auto; width:min(406px,calc(100vw - 24px)); top:12px; }
+body:has(.phone-preview) .toast-stack {
+  right: max(12px, calc((100vw - 430px) / 2 + 12px));
+  left: auto;
+  width: min(406px, calc(100vw - 24px));
+  top: 12px;
+}

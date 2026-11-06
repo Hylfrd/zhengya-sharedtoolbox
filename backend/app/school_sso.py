@@ -16,13 +16,13 @@ import httpx
 from gmssl import func, sm2
 
 
-SCHOOL_ORIGIN = "https://sso.bnbu.edu.cn"
-_SM2_ORDER = int(sm2.default_ecc_table["n"], 16)
+SCHOOL_ORIGIN = 'https://sso.bnbu.edu.cn'
+_SM2_ORDER = int(sm2.default_ecc_table['n'], 16)
 
 
 def _secure_random_hex(length: int) -> str:
     if length == 64:
-        return f"{secrets.randbelow(_SM2_ORDER - 1) + 1:064x}"
+        return f'{secrets.randbelow(_SM2_ORDER - 1) + 1:064x}'
     return secrets.token_hex((length + 1) // 2)[:length]
 
 
@@ -46,28 +46,26 @@ class SchoolAuthError(Exception):
 
 
 def _unavailable() -> SchoolAuthError:
-    return SchoolAuthError(
-        "SCHOOL_AUTH_UNAVAILABLE", "学校认证暂时不可用，请稍后重试。"
-    )
+    return SchoolAuthError('SCHOOL_AUTH_UNAVAILABLE', '学校认证暂时不可用，请稍后重试。')
 
 
 def _challenge() -> SchoolAuthError:
     return SchoolAuthError(
-        "SCHOOL_CHALLENGE_REQUIRED",
-        "学校要求额外验证，当前暂不支持，请先使用学校官方登录入口。",
+        'SCHOOL_CHALLENGE_REQUIRED',
+        '学校要求额外验证，当前暂不支持，请先使用学校官方登录入口。',
     )
 
 
 def _headers(client: httpx.AsyncClient) -> dict[str, str]:
     stamp = str(time.time_ns() // 1_000_000)
-    rt = client.cookies.get("rt") or ""
+    rt = client.cookies.get('rt') or ''
     return {
-        "Accept": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        "Referer": SCHOOL_ORIGIN + "/",
-        "tencent-Request-T": stamp,
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': SCHOOL_ORIGIN + '/',
+        'tencent-Request-T': stamp,
         # This MD5 is the school's request-format checksum, not password storage.
-        "tencent-Request-Key": hashlib.md5(
+        'tencent-Request-Key': hashlib.md5(
             (rt + stamp).encode(), usedforsecurity=False
         ).hexdigest(),
     }
@@ -89,28 +87,28 @@ async def _json_request(
 
 
 def _login_path(result: dict[str, Any]) -> str:
-    entries = result.get("data")
-    if result.get("httpStatus") != "OK" or not isinstance(entries, list):
+    entries = result.get('data')
+    if result.get('httpStatus') != 'OK' or not isinstance(entries, list):
         raise _unavailable()
     matches = [
         entry
         for entry in entries
         if isinstance(entry, dict)
-        and entry.get("authType") == "LDAP"
-        and entry.get("enable") is True
+        and entry.get('authType') == 'LDAP'
+        and entry.get('enable') is True
     ]
     if len(matches) != 1:
         raise _unavailable()
     entry = matches[0]
-    suffix = entry.get("url")
+    suffix = entry.get('url')
     if (
-        entry.get("baseUrl") != "/auth/pwd"
+        entry.get('baseUrl') != '/auth/pwd'
         or not isinstance(suffix, str)
-        or not re.fullmatch(r"/ldap-[A-Za-z0-9_-]+", suffix)
+        or not re.fullmatch(r'/ldap-[A-Za-z0-9_-]+', suffix)
     ):
         raise _unavailable()
-    path = "/auth/pwd" + suffix
-    if entry.get("fullUrl", path) != path:
+    path = '/auth/pwd' + suffix
+    if entry.get('fullUrl', path) != path:
         raise _unavailable()
     return path
 
@@ -118,31 +116,31 @@ def _login_path(result: dict[str, Any]) -> str:
 def _encrypt_password(password: str, public_key: Any) -> str:
     if not isinstance(public_key, str):
         raise _unavailable()
-    if len(public_key) == 130 and public_key.startswith("04"):
+    if len(public_key) == 130 and public_key.startswith('04'):
         public_key = public_key[2:]
-    if not re.fullmatch(r"[0-9a-fA-F]{128}", public_key):
+    if not re.fullmatch(r'[0-9a-fA-F]{128}', public_key):
         raise _unavailable()
-    cipher = sm2.CryptSM2(private_key="", public_key=public_key, mode=1)
+    cipher = sm2.CryptSM2(private_key='', public_key=public_key, mode=1)
     # The library constructor uses lstrip('04'), which can trim coordinate digits.
     cipher.public_key = public_key
     try:
-        ciphertext = cipher.encrypt(password.encode("utf-8"))
+        ciphertext = cipher.encrypt(password.encode('utf-8'))
     except (ValueError, TypeError, IndexError, ZeroDivisionError):
         raise _unavailable() from None
     if not ciphertext:
         raise _unavailable()
     # The school's SM2Cipher(1) wire format includes the uncompressed point tag.
-    return "04" + ciphertext.hex()
+    return '04' + ciphertext.hex()
 
 
 def _identity(result: dict[str, Any], username: str) -> SchoolIdentity:
-    data = result.get("data")
-    if result.get("httpStatus") != "OK" or not isinstance(data, dict):
+    data = result.get('data')
+    if result.get('httpStatus') != 'OK' or not isinstance(data, dict):
         raise _unavailable()
-    actual_username = data.get("individualUserName")
-    name = data.get("individualDisplayName")
-    school_code = data.get("subjectCode")
-    identity_id = data.get("individualId")
+    actual_username = data.get('individualUserName')
+    name = data.get('individualDisplayName')
+    school_code = data.get('subjectCode')
+    identity_id = data.get('individualId')
     if (
         not isinstance(actual_username, str)
         or actual_username.casefold() != username.casefold()
@@ -152,8 +150,7 @@ def _identity(result: dict[str, Any], username: str) -> SchoolIdentity:
         or not name.strip()
         or len(name) > 200
         or (
-            school_code is not None
-            and (not isinstance(school_code, str) or len(school_code) > 200)
+            school_code is not None and (not isinstance(school_code, str) or len(school_code) > 200)
         )
     ):
         raise _unavailable()
@@ -176,42 +173,40 @@ async def authenticate(
                 follow_redirects=False,
                 transport=transport,
             ) as client:
-                response = await client.get("/")
+                response = await client.get('/')
                 if response.status_code != 200:
                     raise _unavailable()
                 path = _login_path(
-                    await _json_request(client, "GET", "/auth/loginEntrance?context=")
+                    await _json_request(client, 'GET', '/auth/loginEntrance?context=')
                 )
-                key = await _json_request(client, "GET", "/auth/flow/login/getSm2PubK")
-                if key.get("httpStatus") != "OK":
+                key = await _json_request(client, 'GET', '/auth/flow/login/getSm2PubK')
+                if key.get('httpStatus') != 'OK':
                     raise _unavailable()
-                encrypted = _encrypt_password(password, key.get("data"))
+                encrypted = _encrypt_password(password, key.get('data'))
                 result = await _json_request(
                     client,
-                    "POST",
+                    'POST',
                     path,
                     json={
-                        "userName": username,
-                        "password": encrypted,
-                        "verifyCode": "",
+                        'userName': username,
+                        'password': encrypted,
+                        'verifyCode': '',
                     },
                 )
-                data = result.get("data")
+                data = result.get('data')
                 if not isinstance(data, dict):
                     raise _unavailable()
-                if data.get("needVerifyCode"):
+                if data.get('needVerifyCode'):
                     raise _challenge()
-                if not isinstance(data.get("url"), str) or not data["url"]:
-                    if data.get("message"):
+                if not isinstance(data.get('url'), str) or not data['url']:
+                    if data.get('message'):
                         raise SchoolAuthError(
-                            "SCHOOL_CREDENTIALS_REJECTED", "学校未接受此账号或密码。", 401
+                            'SCHOOL_CREDENTIALS_REJECTED', '学校未接受此账号或密码。', 401
                         )
                     raise _unavailable()
                 # A redirect URL alone proves no identity. Read and match the
                 # current user on this isolated school session before accepting.
-                return _identity(
-                    await _json_request(client, "GET", "/auth/getUser"), username
-                )
+                return _identity(await _json_request(client, 'GET', '/auth/getUser'), username)
     except (httpx.HTTPError, httpx.CookieConflict, TimeoutError):
         # Never expose upstream response bodies, URLs, tokens or exception text.
         raise _unavailable() from None

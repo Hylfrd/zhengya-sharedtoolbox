@@ -5,8 +5,8 @@ const active: { message: string; close: () => void; element: HTMLElement }[] = [
 
 /** User-facing messages are always text nodes, including server-provided errors. */
 export function showToast(message: string, kind: Kind = 'error'): void {
-  active.filter(item => !item.element.isConnected).forEach(item => item.close());
-  if (!message.trim() || active.some(item => item.message === message)) return;
+  active.filter((item) => !item.element.isConnected).forEach((item) => item.close());
+  if (!message.trim() || active.some((item) => item.message === message)) return;
   // A popover outside a modal dialog is still inert. Keep notifications inside
   // the active modal's subtree so their close button and live region work.
   const host = document.querySelector<HTMLDialogElement>('dialog[open]') ?? document.body;
@@ -15,7 +15,10 @@ export function showToast(message: string, kind: Kind = 'error'): void {
     stack = document.createElement('div');
     stack.id = 'tts-toasts';
     stack.className = 'toast-stack';
-    stack.setAttribute('aria-label', document.documentElement.lang === 'en' ? 'Notifications' : '通知');
+    stack.setAttribute(
+      'aria-label',
+      document.documentElement.lang === 'en' ? 'Notifications' : '通知',
+    );
     if ('showPopover' in stack) stack.setAttribute('popover', 'manual');
     host.append(stack);
   } else if (stack.parentElement !== host) {
@@ -30,14 +33,20 @@ export function showToast(message: string, kind: Kind = 'error'): void {
   const symbol = document.createElement('span');
   symbol.className = 'toast-symbol';
   symbol.setAttribute('aria-hidden', 'true');
-  symbol.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/>${kind === 'success' ? '<path d="m8 12 3 3 5-6"/>' : '<path d="M12 7v6m0 4v.01"/>'}</svg>`;
+  symbol.innerHTML =
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">` +
+    `<circle cx="12" cy="12" r="9"/>${kind === 'success' ? '<path d="m8 12 3 3 5-6"/>' : '<path d="M12 7v6m0 4v.01"/>'}</svg>`;
   const text = document.createElement('p');
   text.textContent = message;
   const dismiss = document.createElement('button');
   dismiss.type = 'button';
   dismiss.className = 'toast-dismiss';
-  dismiss.setAttribute('aria-label', document.documentElement.lang === 'en' ? 'Dismiss notification' : '关闭通知');
-  dismiss.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg>';
+  dismiss.setAttribute(
+    'aria-label',
+    document.documentElement.lang === 'en' ? 'Dismiss notification' : '关闭通知',
+  );
+  dismiss.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg>';
   const progress = document.createElement('span');
   progress.className = 'toast-progress';
   progress.setAttribute('aria-hidden', 'true');
@@ -54,18 +63,22 @@ export function showToast(message: string, kind: Kind = 'error'): void {
     closing = true;
     clearTimeout(timer);
     progress.style.animationPlayState = 'paused';
-    const index = active.findIndex(item => item.close === close);
+    const index = active.findIndex((item) => item.close === close);
     if (index >= 0) active.splice(index, 1);
     const hadFocus = toast.contains(document.activeElement);
     toast.classList.add('is-leaving');
-    window.setTimeout(() => {
-      toast.remove();
-      if (hadFocus && previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
-      if (!stack.childElementCount) {
-        if (stack.hasAttribute('popover') && stack.matches(':popover-open')) stack.hidePopover();
-        stack.remove();
-      }
-    }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260);
+    window.setTimeout(
+      () => {
+        toast.remove();
+        if (hadFocus && previousFocus instanceof HTMLElement && previousFocus.isConnected)
+          previousFocus.focus();
+        if (!stack.childElementCount) {
+          if (stack.hasAttribute('popover') && stack.matches(':popover-open')) stack.hidePopover();
+          stack.remove();
+        }
+      },
+      matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260,
+    );
   };
   const pause = (): void => {
     if (!timer) return;
@@ -75,7 +88,8 @@ export function showToast(message: string, kind: Kind = 'error'): void {
     remaining = Math.max(0, remaining - (performance.now() - started));
   };
   const resume = (): void => {
-    if (closing || timer || toast.matches(':hover') || toast.contains(document.activeElement)) return;
+    if (closing || timer || toast.matches(':hover') || toast.contains(document.activeElement))
+      return;
     started = performance.now();
     progress.style.animationPlayState = 'running';
     timer = setTimeout(close, remaining);

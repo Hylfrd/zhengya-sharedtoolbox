@@ -6,7 +6,10 @@ umask 022
 sha=${1:?Expected commit SHA}
 run=${2:?Expected deployment run ID}
 [[ "$sha" =~ ^[0-9a-f]{40}$ && "$run" =~ ^[0-9]+-[0-9]+$ ]] || exit 2
-[[ $(id -u) == 0 ]] || { echo 'Deployment needs root for its systemd unit and Caddy import.'; exit 1; }
+[[ $(id -u) == 0 ]] || {
+  echo 'Deployment needs root for its systemd unit and Caddy import.'
+  exit 1
+}
 base=/var/www/tongtongsuo
 incoming="$base/incoming/$run"
 release="$base/releases/$sha-$run"
@@ -18,9 +21,15 @@ import='import /etc/caddy/tongtongsuo.caddy'
 
 mkdir -p "$base/releases" "$base/backups"
 exec 9>"$base/deploy.lock"
-flock -n 9 || { echo 'Another deployment is running.'; exit 1; }
+flock -n 9 || {
+  echo 'Another deployment is running.'
+  exit 1
+}
 [[ -f "$incoming/release.tar.gz" && -f "$caddyfile" ]]
-[[ ! -e "$release" && ! -e "$backup" ]] || { echo 'Run already exists; rerun the workflow for a new attempt.'; exit 1; }
+[[ ! -e "$release" && ! -e "$backup" ]] || {
+  echo 'Run already exists; rerun the workflow for a new attempt.'
+  exit 1
+}
 systemctl is-active --quiet caddy
 if ! systemctl is-active --quiet tongtongsuo && ss -ltnH 'sport = :18731' | grep -q .; then
   echo 'Port 18731 belongs to another process; refusing to deploy.'
@@ -110,8 +119,14 @@ rollback() {
     rm -f "$unit"
   fi
   systemctl daemon-reload
-  if $was_enabled; then systemctl enable tongtongsuo; else systemctl disable tongtongsuo 2>/dev/null; fi
-  if $was_active; then systemctl start tongtongsuo; fi
+  if $was_enabled; then
+    systemctl enable tongtongsuo
+  else
+    systemctl disable tongtongsuo 2>/dev/null
+  fi
+  if $was_active; then
+    systemctl start tongtongsuo
+  fi
   exit "$code"
 }
 trap rollback ERR
@@ -137,10 +152,16 @@ assert data.get("version") == sys.argv[1], "Unexpected deployed revision"
 }
 healthy=false
 for _attempt in $(seq 1 15); do
-  if check_release http://127.0.0.1:18731/api/health 2>/dev/null; then healthy=true; break; fi
+  if check_release http://127.0.0.1:18731/api/health 2>/dev/null; then
+    healthy=true
+    break
+  fi
   sleep 2
 done
-$healthy || { echo 'Application did not become healthy.'; false; }
+$healthy || {
+  echo 'Application did not become healthy.'
+  false
+}
 curl --fail --silent --show-error --max-time 5 http://127.0.0.1:18731/ >/dev/null
 
 # Stop if another administrator changed the main configuration during deployment.
@@ -156,10 +177,16 @@ systemctl reload caddy
 # Allow automatic certificate issuance, checking through the actual public URL.
 healthy=false
 for _attempt in $(seq 1 24); do
-  if check_release https://bnbu.hmcl-helper.cn/api/health 2>/dev/null; then healthy=true; break; fi
+  if check_release https://bnbu.hmcl-helper.cn/api/health 2>/dev/null; then
+    healthy=true
+    break
+  fi
   sleep 5
 done
-$healthy || { echo 'Public HTTPS did not become healthy; check DNS and certificate issuance.'; false; }
+$healthy || {
+  echo 'Public HTTPS did not become healthy; check DNS and certificate issuance.'
+  false
+}
 curl --fail --silent --show-error --max-time 10 https://bnbu.hmcl-helper.cn/ >/dev/null
 systemctl enable tongtongsuo
 trap - ERR

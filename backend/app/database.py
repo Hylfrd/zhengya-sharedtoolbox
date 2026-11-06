@@ -62,54 +62,77 @@ CREATE INDEX IF NOT EXISTS loans_cabinet ON loans(cabinet_id);
 
 class Database:
     def __init__(self, path: Path | None = None):
-        self.path = Path(path or os.environ.get("DATABASE_PATH", "runtime/tongtongsuo.sqlite3"))
+        self.path = Path(path or os.environ.get('DATABASE_PATH', 'runtime/tongtongsuo.sqlite3'))
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as connection:
-            connection.execute("PRAGMA journal_mode=WAL")
-            connection.executescript("BEGIN IMMEDIATE;\n" + SCHEMA + "\nCOMMIT;")
+            connection.execute('PRAGMA journal_mode=WAL')
+            connection.executescript('BEGIN IMMEDIATE;\n' + SCHEMA + '\nCOMMIT;')
         self._migrate()
 
     def _migrate(self):
         with self.transaction(write=True) as connection:
-            connection.execute("CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY)")
-            columns = {row["name"] for row in connection.execute("PRAGMA table_info(tools)")}
-            for name, default in (("unit", "件"), ("unit_en", ""), ("name_en", ""), ("description_en", "")):
+            connection.execute(
+                'CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY)'
+            )
+            columns = {row['name'] for row in connection.execute('PRAGMA table_info(tools)')}
+            for name, default in (
+                ('unit', '件'),
+                ('unit_en', ''),
+                ('name_en', ''),
+                ('description_en', ''),
+            ):
                 if name not in columns:
                     # Identifiers and defaults are fixed above, never user input.
-                    connection.execute(f"ALTER TABLE tools ADD COLUMN {name} TEXT NOT NULL DEFAULT '{default}'")
-            migration = "initial_area_cabinets_v1"
-            if connection.execute("SELECT 1 FROM schema_migrations WHERE name=?", (migration,)).fetchone() is None:
-                for code in ("A", "B"):
                     connection.execute(
-                        "INSERT INTO cabinets (code,name,group_name) VALUES (?,?,?) ON CONFLICT(code) DO NOTHING",
-                        (code, f"{code}区", f"{code}区"),
+                        f"ALTER TABLE tools ADD COLUMN {name} TEXT NOT NULL DEFAULT '{default}'"
+                    )
+            migration = 'initial_area_cabinets_v1'
+            if (
+                connection.execute(
+                    'SELECT 1 FROM schema_migrations WHERE name=?', (migration,)
+                ).fetchone()
+                is None
+            ):
+                for code in ('A', 'B'):
+                    connection.execute(
+                        'INSERT INTO cabinets (code,name,group_name) VALUES (?,?,?) ON CONFLICT(code) DO NOTHING',
+                        (code, f'{code}区', f'{code}区'),
                     )
                 # A deleted or renamed cabinet must not reappear on restart.
-                connection.execute("INSERT INTO schema_migrations (name) VALUES (?)", (migration,))
-            inventory_migration = "initial_area_tools_v2"
-            if connection.execute("SELECT 1 FROM schema_migrations WHERE name=?", (inventory_migration,)).fetchone() is None:
+                connection.execute('INSERT INTO schema_migrations (name) VALUES (?)', (migration,))
+            inventory_migration = 'initial_area_tools_v2'
+            if (
+                connection.execute(
+                    'SELECT 1 FROM schema_migrations WHERE name=?', (inventory_migration,)
+                ).fetchone()
+                is None
+            ):
                 # Initial editable inventory requested for A/B; no devices or loans are created.
                 initial_tools = (
-                    ("螺丝刀", "Screwdriver", "screwdriver"),
-                    ("卷尺", "Tape measure", "tape"),
-                    ("羊角锤", "Claw hammer", "hammer"),
-                    ("尖嘴钳", "Needle-nose pliers", "pliers"),
+                    ('螺丝刀', 'Screwdriver', 'screwdriver'),
+                    ('卷尺', 'Tape measure', 'tape'),
+                    ('羊角锤', 'Claw hammer', 'hammer'),
+                    ('尖嘴钳', 'Needle-nose pliers', 'pliers'),
                 )
-                for cabinet in connection.execute("SELECT id FROM cabinets WHERE code IN ('A','B')").fetchall():
+                for cabinet in connection.execute(
+                    "SELECT id FROM cabinets WHERE code IN ('A','B')"
+                ).fetchall():
                     for name, english, icon in initial_tools:
                         connection.execute(
                             """INSERT INTO tools (cabinet_id,name,name_en,quantity,unit,unit_en,icon)
                                 SELECT ?,?,?,1,'把','pc',?
                                 WHERE NOT EXISTS (SELECT 1 FROM tools WHERE cabinet_id=? AND name=?)""",
-                            (cabinet["id"], name, english, icon, cabinet["id"], name),
+                            (cabinet['id'], name, english, icon, cabinet['id'], name),
                         )
-                connection.execute("INSERT INTO schema_migrations (name) VALUES (?)", (inventory_migration,))
+                connection.execute(
+                    'INSERT INTO schema_migrations (name) VALUES (?)', (inventory_migration,)
+                )
 
     @contextmanager
     def connect(self):
         connection = sqlite3.connect(self.path, timeout=10, isolation_level=None)
         connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute('PRAGMA foreign_keys=ON')
         try:
             yield connection
         finally:
@@ -118,7 +141,7 @@ class Database:
     @contextmanager
     def transaction(self, *, write=False):
         with self.connect() as connection:
-            connection.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            connection.execute('BEGIN IMMEDIATE' if write else 'BEGIN')
             try:
                 yield connection
                 connection.commit()

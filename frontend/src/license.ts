@@ -23,6 +23,8 @@ export function mountLicense(root: HTMLElement): void {
         <footer class="license-end"><a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU 官方原文 ${icon('arrow')}</a><a class="license-return" data-license-return>${icon('back')}<span>返回</span></a></footer>
       </article>
     </main>`;
-  root.querySelectorAll<HTMLAnchorElement>('[data-license-return]').forEach(link => { link.href = from; });
+  root.querySelectorAll<HTMLAnchorElement>('[data-license-return]').forEach((link) => {
+    link.href = from;
+  });
   root.querySelector<HTMLElement>('[data-license-text]')!.textContent = englishLicense;
 }

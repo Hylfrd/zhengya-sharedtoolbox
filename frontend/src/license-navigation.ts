@@ -1,6 +1,13 @@
 /** Preserve local entry context without accepting an external return destination. */
 export function safeReturnPath(value: string | null): string {
-  if (!value || value.length > 2048 || !value.startsWith('/') || value.startsWith('//') || /[\\\p{Cc}\p{Cf}\p{Cs}]/u.test(value)) return '/';
+  if (
+    !value ||
+    value.length > 2048 ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    /[\\\p{Cc}\p{Cf}\p{Cs}]/u.test(value)
+  )
+    return '/';
   try {
     const url = new URL(value, 'https://toolbox.invalid');
     if (url.origin !== 'https://toolbox.invalid') return '/';
@@ -10,9 +17,11 @@ export function safeReturnPath(value: string | null): string {
     if (url.pathname !== rawPath || /[\\\p{Cc}\p{Cf}\p{Cs}]/u.test(decoded)) return '/';
     // Controls remain unsafe even when encoded in query or fragment values.
     if (/[\\\p{Cc}\p{Cf}\p{Cs}]/u.test(decodeURIComponent(url.search + url.hash))) return '/';
-    if (['/', '/m', '/m/', '/admin', '/contact'].includes(decoded)) return rawPath + url.search + url.hash;
+    if (['/', '/m', '/m/', '/admin', '/contact'].includes(decoded))
+      return rawPath + url.search + url.hash;
     const match = decoded.match(/^\/(?:m\/)?scan\/([^/]+)\/?$/u);
-    if (!match || match[1].length > 64 || ['.', '..'].includes(match[1]) || /[%?#]/.test(match[1])) return '/';
+    if (!match || match[1].length > 64 || ['.', '..'].includes(match[1]) || /[%?#]/.test(match[1]))
+      return '/';
     return rawPath + url.search + url.hash;
   } catch {
     return '/';

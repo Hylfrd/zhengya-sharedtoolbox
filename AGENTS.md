@@ -14,3 +14,11 @@ docs(project): initialize repository documentation
 feat(ttlock): fetch locks from the cloud API
 fix(auth): refresh expired access tokens
 ```
+
+# Code formatting
+
+- 使用空格缩进，删除行尾多余空格，并在文件末尾保留换行。保持每种语言的既有缩进宽度，不要全项目强制使用相同宽度。
+- 前端 TypeScript、CSS、HTML、测试和配置使用项目配置的 Prettier：2 个空格缩进、单引号、目标行宽 100。运行 `npm --prefix frontend run format` 格式化，运行 `npm --prefix frontend run format:check` 检查。
+- Python 使用项目配置的 Ruff formatter：4 个空格缩进、优先单引号、目标行宽 100。安装 `backend/requirements-dev.txt` 后，从仓库根目录运行 `python -m ruff format backend deploy/wheels.py`；检查时增加 `--check`。
+- Shell 和 YAML 保持 2 个空格缩进。将过长的表达式、HTML 和样式按结构拆分，保持代码易读；行宽是目标，不要为了满足长度而破坏可读性。
+- 格式调整必须保持行为不变。尤其注意字符串、HTML 模板、内联元素之间的空白、正则表达式和 Shell heredoc；不要为换行而改变其内容或语义。第三方文件、生成文件及锁文件不做无关格式化。
